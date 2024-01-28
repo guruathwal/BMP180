@@ -4,7 +4,7 @@
    temperature sensor
 
    Power supply voltage:   1.8v - 3.6v
-   Range:                  30,000Pa..110,000Pa at -40°C..+85°C 
+   Range:                  30,000Pa..110,000Pa at -40°C..+85°C
    Typ. resolution:        1Pa     / 0.1°C
    Typ. accuracy:          ±100Pa* / ±1.0°C* at 0°C..+65°C
    Typ. relative accuracy: ±12Pa   / xx°C
@@ -79,7 +79,7 @@ bool BMP180::begin(uint8_t sda, uint8_t scl)
   Wire.setClock(100000);                                        //experimental! ESP8266 i2c bus speed: 50kHz..400kHz/50000..400000, default 100000
   Wire.setClockStretchLimit(230);                               //experimental! default 230usec
 #else
-bool BMP180::begin(void) 
+bool BMP180::begin(void)
 {
   Wire.begin();
   Wire.setClock(100000);                                        //experimental! AVR i2c bus speed: 31kHz..400kHz/31000..400000, default 100000
@@ -94,15 +94,14 @@ bool BMP180::begin(void)
 /*
     getPressure()
 
-    Calculates compensated pressure, in Pa
+    Calculates compensated pressure, in Pa using the provided temperature.
 
     NOTE:
     - resolutin 1Pa with accuracy ±150Pa at range 30,000Pa..110,000Pa
 */
 /**************************************************************************/
-int32_t BMP180::getPressure(void)
+int32_t BMP180::getPressure(float temperature)
 {
-  int32_t  UT       = 0;
   int32_t  UP       = 0;
   int32_t  B3       = 0;
   int32_t  B5       = 0;
@@ -114,13 +113,10 @@ int32_t BMP180::getPressure(void)
   uint32_t B4       = 0;
   uint32_t B7       = 0;
 
-  UT = readRawTemperature();                                            //read uncompensated temperature, 16-bit
-  if (UT == BMP180_ERROR) return BMP180_ERROR;                          //error handler, collision on i2c bus
-
   UP = readRawPressure();                                               //read uncompensated pressure, 19-bit
   if (UP == BMP180_ERROR) return BMP180_ERROR;                          //error handler, collision on i2c bus
 
-  B5 = computeB5(UT);
+  B5 = ((int)(temperature * 10) << 4) - 8;
 
   /* pressure calculation */
   B6 = B5 - 4000;
@@ -134,7 +130,7 @@ int32_t BMP180::getPressure(void)
   X3 = ((X1 + X2) + 2) >> 2;
   B4 = ((uint32_t)_calCoeff.bmpAC4 * (X3 + 32768L)) >> 15;
   B7 = (UP - B3) * (50000UL >> _resolution);
-  
+
   if (B4 == 0) return BMP180_ERROR;                                     //safety check, avoiding division by zero
 
   if   (B7 < 0x80000000) pressure = (B7 * 2) / B4;
@@ -147,6 +143,27 @@ int32_t BMP180::getPressure(void)
   return pressure = pressure + ((X1 + X2 + 3791L) >> 4);
 }
 
+/**************************************************************************/
+/*
+    getPressure()
+
+    Calculates compensated pressure, in Pa
+
+    NOTE:
+    - resolutin 1Pa with accuracy ±150Pa at range 30,000Pa..110,000Pa
+*/
+/**************************************************************************/
+int32_t BMP180::getPressure(void)
+{
+  float UT;
+  float B5;
+
+  UT = readRawTemperature();                                            //read uncompensated temperature, 16-bit
+  if (UT == BMP180_ERROR) return BMP180_ERROR;                          //error handler, collision on i2c bus
+
+  B5 = computeB5(UT);
+  return getPressure(B5);
+}
 /**************************************************************************/
 /*
     getTemperature()
@@ -171,6 +188,33 @@ float BMP180::getTemperature(void)
 
     Converts current pressure to sea level pressure at specific true
     altitude, in Pa
+
+    NOTE:
+    - true altitude is the actual elevation above sea level, to find out
+      your current true altitude do search with google earth or gps
+    - see level pressure is commonly used in weather reports & forecasts
+      to compensate current true altitude
+    - for example, we know that a sunny day happens if the current sea
+      level pressure is 250Pa above the average sea level pressure of
+      101325 Pa, so by converting the current pressure to sea level &
+      comparing it with an average sea level pressure we can instantly
+      predict the weather conditions
+*/
+/**************************************************************************/
+int32_t BMP180::getSeaLevelPressure(float temperature, int16_t trueAltitude)
+{
+  int32_t pressure = getPressure(temperature);
+
+  if (pressure == BMP180_ERROR) return BMP180_ERROR;
+                                return (pressure / pow(1.0 - (float)trueAltitude / 44330, 5.255));
+}
+
+/**************************************************************************/
+/*
+    getSeaLevelPressure()
+
+    Converts current pressure to sea level pressure at specific true
+    altitude, in Pa using the provided temperature.
 
     NOTE:
     - true altitude is the actual elevation above sea level, to find out
@@ -503,7 +547,7 @@ bool BMP180::write8(uint8_t reg, uint8_t control)
   Wire.send(reg);
   Wire.send(control);
   #endif
-  
+
   if (Wire.endTransmission(true) == 0) return true;
                                        return false; //error handler, collision on i2c bus
 }

@@ -4,7 +4,7 @@
    temperature sensor
 
    Power supply voltage:   1.8v - 3.6v
-   Range:                  30,000Pa..110,000Pa at -40°C..+85°C 
+   Range:                  30,000Pa..110,000Pa at -40°C..+85°C
    Typ. resolution:        1Pa     / 0.1°C
    Typ. accuracy:          ±100Pa* / ±1.0°C* at 0°C..+65°C
    Typ. relative accuracy: ±12Pa   / xx°C
@@ -46,7 +46,7 @@
 
 #ifndef BMP180_h
 #define BMP180_h
-  
+
 #if defined(ARDUINO) && ((ARDUINO) >= 100) //arduino core v1.0 or later
 #include <Arduino.h>
 #else
@@ -145,8 +145,10 @@ class BMP180
   #else
   bool    begin(void);
   #endif
+  int32_t getPressure(float temperature); //in Pa, temperature in °C
   int32_t getPressure(void);                               //in Pa
   float   getTemperature(void);                            //in °C
+  int32_t getSeaLevelPressure(float temperature, int16_t trueAltitude = 115); //in Pa, temperature, in °C, by default true altitude id 115 meters
   int32_t getSeaLevelPressure(int16_t trueAltitude = 115); //in Pa, by default true altitude id 115 meters
   void    softReset(void);
   uint8_t readFirmwareVersion(void);
