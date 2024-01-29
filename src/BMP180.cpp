@@ -155,14 +155,14 @@ int32_t BMP180::getPressure(float temperature)
 /**************************************************************************/
 int32_t BMP180::getPressure(void)
 {
-  float UT;
-  float B5;
+  float rawTemperature;
+  float temperature;
 
-  UT = readRawTemperature();                                            //read uncompensated temperature, 16-bit
-  if (UT == BMP180_ERROR) return BMP180_ERROR;                          //error handler, collision on i2c bus
+  rawTemperature = readRawTemperature();                                            //read uncompensated temperature, 16-bit
+  if (rawTemperature == BMP180_ERROR) return BMP180_ERROR;                          //error handler, collision on i2c bus
 
-  B5 = computeB5(UT);
-  return getPressure(B5);
+  temperature = (float)((computeB5(rawTemperature) + 8) >> 4) / 10;;
+  return getPressure(temperature);
 }
 /**************************************************************************/
 /*
